@@ -1,0 +1,51 @@
+name: Publish Cycle for iPhone
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pick the newest app version
+        run: |
+          mkdir -p _site
+          F=$(ls cycle-iphone-v*.html 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$F" ] || [ ! -f "$F" ]; then
+            echo "::error::No app file found. Upload cycle-iphone-vX.html to the top level of the repository."
+            exit 1
+          fi
+          for need in sw.js icon.png; do
+            if [ ! -f "$need" ]; then
+              echo "::error::$need is missing. Upload it to the top level of the repository."
+              exit 1
+            fi
+          done
+          echo "Publishing $F"
+          cp "$F" _site/index.html
+          cp sw.js icon.png _site/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
